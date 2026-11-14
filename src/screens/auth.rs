@@ -1,5 +1,6 @@
 use eframe::egui::{self, RichText};
 
+use crate::session::Session;
 use crate::theme;
 
 #[derive(Default, PartialEq, Eq, Clone, Copy)]
@@ -25,7 +26,8 @@ pub struct AuthScreen {
 }
 
 impl AuthScreen {
-    pub fn show(&mut self, ui: &mut egui::Ui) {
+    pub fn show(&mut self, ui: &mut egui::Ui) -> Option<Session> {
+        let mut session = None;
         let content_height = match self.mode {
             Mode::Login => 560.0,
             Mode::Register => 680.0,
@@ -47,10 +49,14 @@ impl AuthScreen {
                 ui.add_space(16.0);
 
                 if theme::secondary_button(ui, "  Mit Google fortfahren").clicked() {
-                    self.notice = Some(Notice::Info("Die Anmeldung mit Google ist noch nicht verfügbar.".to_owned()));
+                    self.notice = Some(Notice::Info(
+                        "Die Anmeldung mit Google ist noch nicht verfügbar.".to_owned(),
+                    ));
                 }
                 if theme::secondary_button(ui, "  Mit Apple fortfahren").clicked() {
-                    self.notice = Some(Notice::Info("Die Anmeldung mit Apple ist noch nicht verfügbar.".to_owned()));
+                    self.notice = Some(Notice::Info(
+                        "Die Anmeldung mit Apple ist noch nicht verfügbar.".to_owned(),
+                    ));
                 }
 
                 ui.add_space(8.0);
@@ -65,7 +71,8 @@ impl AuthScreen {
                 submitted |= text_field(ui, &mut self.email, "E-Mail", false);
                 submitted |= text_field(ui, &mut self.password, "Passwort", true);
                 if self.mode == Mode::Register {
-                    submitted |= text_field(ui, &mut self.password_confirm, "Passwort bestätigen", true);
+                    submitted |=
+                        text_field(ui, &mut self.password_confirm, "Passwort bestätigen", true);
                 }
 
                 if let Some(notice) = &self.notice {
@@ -82,7 +89,7 @@ impl AuthScreen {
                     Mode::Register => "Registrieren",
                 };
                 if theme::primary_button(ui, submit_label).clicked() || submitted {
-                    self.submit();
+                    session = self.submit();
                 }
 
                 ui.add_space(8.0);
@@ -94,17 +101,25 @@ impl AuthScreen {
                     ui.horizontal(|ui| {
                         let width = ui.fonts_mut(|fonts| {
                             let font = egui::TextStyle::Body.resolve(ui.style());
-                            fonts.layout_no_wrap(format!("{question} {action}"), font, theme::TEXT).size().x
+                            fonts
+                                .layout_no_wrap(format!("{question} {action}"), font, theme::TEXT)
+                                .size()
+                                .x
                         });
                         ui.add_space(((ui.available_width() - width) / 2.0 - 4.0).max(0.0));
                         ui.label(RichText::new(question).color(theme::TEXT_MUTED));
-                        if ui.link(RichText::new(action).color(theme::ACCENT_HOVER)).clicked() {
+                        if ui
+                            .link(RichText::new(action).color(theme::ACCENT_HOVER))
+                            .clicked()
+                        {
                             self.set_mode(target);
                         }
                     });
                 });
             });
         });
+
+        session
     }
 
     fn mode_switch(&mut self, ui: &mut egui::Ui) {
@@ -112,10 +127,17 @@ impl AuthScreen {
         ui.horizontal(|ui| {
             for (mode, label) in [(Mode::Login, "Anmelden"), (Mode::Register, "Registrieren")] {
                 let selected = self.mode == mode;
-                let text = RichText::new(label).color(if selected { theme::TEXT } else { theme::TEXT_MUTED });
-                let mut button = egui::Button::new(text).corner_radius(egui::CornerRadius::same(theme::RADIUS));
+                let text = RichText::new(label).color(if selected {
+                    theme::TEXT
+                } else {
+                    theme::TEXT_MUTED
+                });
+                let mut button =
+                    egui::Button::new(text).corner_radius(egui::CornerRadius::same(theme::RADIUS));
                 if selected {
-                    button = button.fill(theme::SURFACE_HOVER).stroke(egui::Stroke::new(1.0, theme::ACCENT));
+                    button = button
+                        .fill(theme::SURFACE_HOVER)
+                        .stroke(egui::Stroke::new(1.0, theme::ACCENT));
                 }
                 if ui.add_sized([width, 36.0], button).clicked() {
                     self.set_mode(mode);
@@ -133,14 +155,20 @@ impl AuthScreen {
         }
     }
 
-    fn submit(&mut self) {
-        self.notice = Some(match self.validate() {
-            Err(error) => Notice::Error(error),
-            Ok(()) => Notice::Info(match self.mode {
-                Mode::Login => "Eingaben gültig. Die Anmeldung ist noch nicht an einen Server angebunden.".to_owned(),
-                Mode::Register => "Eingaben gültig. Die Registrierung ist noch nicht an einen Server angebunden.".to_owned(),
-            }),
-        });
+    fn submit(&mut self) -> Option<Session> {
+        if let Err(error) = self.validate() {
+            self.notice = Some(Notice::Error(error));
+            return None;
+        }
+
+        let email = self.email.trim().to_owned();
+        let name = match self.mode {
+            Mode::Register => self.name.trim().to_owned(),
+            Mode::Login => email.split('@').next().unwrap_or_default().to_owned(),
+        };
+
+        *self = Self::default();
+        Some(Session { name, email })
     }
 
     fn validate(&self) -> Result<(), String> {
@@ -184,11 +212,16 @@ fn divider(ui: &mut egui::Ui, text: &str) {
             theme::TEXT_MUTED,
         );
         let line_width = ((ui.available_width() - galley.size().x) / 2.0 - 12.0).max(0.0);
-        let (rect, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), galley.size().y), egui::Sense::hover());
+        let (rect, _) = ui.allocate_exact_size(
+            egui::vec2(ui.available_width(), galley.size().y),
+            egui::Sense::hover(),
+        );
         let y = rect.center().y;
         let stroke = egui::Stroke::new(1.0, theme::BORDER);
-        ui.painter().hline(rect.left()..=rect.left() + line_width, y, stroke);
-        ui.painter().hline(rect.right() - line_width..=rect.right(), y, stroke);
+        ui.painter()
+            .hline(rect.left()..=rect.left() + line_width, y, stroke);
+        ui.painter()
+            .hline(rect.right() - line_width..=rect.right(), y, stroke);
         ui.painter().galley(
             egui::pos2(rect.center().x - galley.size().x / 2.0, rect.top()),
             galley,

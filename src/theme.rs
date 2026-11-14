@@ -76,7 +76,11 @@ pub fn card<R>(ui: &mut egui::Ui, add_contents: impl FnOnce(&mut egui::Ui) -> R)
         .inner
 }
 
-pub fn centered<R>(ui: &mut egui::Ui, content_height: f32, add_contents: impl FnOnce(&mut egui::Ui) -> R) -> R {
+pub fn centered<R>(
+    ui: &mut egui::Ui,
+    content_height: f32,
+    add_contents: impl FnOnce(&mut egui::Ui) -> R,
+) -> R {
     egui::ScrollArea::vertical()
         .auto_shrink([false, false])
         .show(ui, |ui| {

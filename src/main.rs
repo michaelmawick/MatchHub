@@ -1,5 +1,6 @@
 mod app;
 mod screens;
+mod session;
 mod theme;
 
 use eframe::egui;
